@@ -1,0 +1,21 @@
+# TGN Configuration File
+
+data:
+  dataset_name: "wikipedia"
+  val_ratio: 0.15
+  test_ratio: 0.15
+
+model:
+  memory_dim: 128
+  message_dim: 128
+  time_dim: 32
+  embedding_dim: 128
+  predictor_hidden_dim: 128
+
+train:
+  batch_size: 200
+  epochs: 5
+  lr: 0.0001
+  weight_decay: 0.00001
+  patience: 3
+  checkpoint_path: "checkpoints/best_model.pt"
