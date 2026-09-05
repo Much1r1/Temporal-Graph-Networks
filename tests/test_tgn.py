@@ -66,6 +66,48 @@ def test_memory_module():
     mem.update_memory(u_nodes, u_msgs, u_ts)
     assert mem.get_last_update(torch.tensor([0])).item() == 3.0
 
+def test_last_message_aggregator_out_of_order():
+    agg = LastMessageAggregator()
+    nodes = torch.tensor([1, 1, 1])
+    # 3 messages for node 1 with out-of-order timestamps
+    # Entry 0: ts 10.0
+    # Entry 1: ts 30.0 (MAX timestamp)
+    # Entry 2: ts 20.0 (Last array entry, but lower timestamp)
+    msg0 = torch.ones(16) * 1.0
+    msg1 = torch.ones(16) * 3.0  # expected selected message
+    msg2 = torch.ones(16) * 2.0
+    msgs = torch.stack([msg0, msg1, msg2], dim=0)
+    timestamps = torch.tensor([10.0, 30.0, 20.0])
+
+    u_nodes, u_msgs, u_ts = agg(nodes, msgs, timestamps)
+    assert len(u_nodes) == 1
+    assert u_nodes[0].item() == 1
+    assert u_ts[0].item() == 30.0
+    assert torch.allclose(u_msgs[0], msg1)
+
+def test_memory_update_isolation():
+    device = torch.device("cpu")
+    mem = NodeMemory(num_nodes=5, memory_dim=16, message_dim=16, device=device)
+
+    # Record initial memory states for all nodes
+    initial_memories = mem.memory.clone()
+
+    # Update only node 2
+    nodes_to_update = torch.tensor([2])
+    aggregated_msgs = torch.randn(1, 16)
+    timestamps = torch.tensor([50.0])
+
+    mem.update_memory(nodes_to_update, aggregated_msgs, timestamps)
+
+    # Confirm node 2 memory changed
+    assert not torch.allclose(mem.get_memory(torch.tensor([2])), initial_memories[2])
+    assert mem.get_last_update(torch.tensor([2])).item() == 50.0
+
+    # Confirm other nodes' memory remain unchanged
+    other_node_ids = torch.tensor([0, 1, 3, 4])
+    assert torch.equal(mem.get_memory(other_node_ids), initial_memories[other_node_ids])
+    assert torch.equal(mem.get_last_update(other_node_ids), torch.zeros(4))
+
 def test_embedding_and_predictor():
     time_enc = TimeEmbedding(dimension=8)
     emb_mod = TemporalEmbedding(node_memory_dim=16, edge_feat_dim=4, time_dim=8, output_dim=16, time_encoder=time_enc)

@@ -34,7 +34,7 @@ class MessageFunction(nn.Module):
 
 class LastMessageAggregator(nn.Module):
     """
-    Aggregates messages for each node by keeping only the last message received in a batch.
+    Aggregates messages for each node by keeping the message corresponding to the maximum timestamp.
     """
     def __init__(self):
         super(LastMessageAggregator, self).__init__()
@@ -53,13 +53,15 @@ class LastMessageAggregator(nn.Module):
         """
         unique_nodes, inv_indices = torch.unique(nodes, return_inverse=True)
         aggregated_messages = torch.zeros((len(unique_nodes), messages.size(1)), device=messages.device, dtype=messages.dtype)
-        aggregated_timestamps = torch.zeros((len(unique_nodes),), device=timestamps.device, dtype=timestamps.dtype)
+        aggregated_timestamps = torch.full((len(unique_nodes),), -float('inf'), device=timestamps.device, dtype=timestamps.dtype)
 
-        # Iterate through messages to keep the last update for each unique node
+        # Iterate through messages to keep the update with the max timestamp for each unique node
         for i in range(len(nodes)):
             node_idx = inv_indices[i]
-            aggregated_messages[node_idx] = messages[i]
-            aggregated_timestamps[node_idx] = timestamps[i]
+            ts = timestamps[i]
+            if ts > aggregated_timestamps[node_idx]:
+                aggregated_messages[node_idx] = messages[i]
+                aggregated_timestamps[node_idx] = ts
 
         return unique_nodes, aggregated_messages, aggregated_timestamps
 
