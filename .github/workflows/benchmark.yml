@@ -1,0 +1,45 @@
+name: Full Benchmark Training
+
+on:
+  workflow_dispatch:  # manual trigger only -- this is slow, not run on every push
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330  # stay under the 6h hosted-runner hard limit
+    strategy:
+      matrix:
+        dataset: [wikipedia, reddit]
+      fail-fast: false  # let both datasets run even if one fails
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch numpy pandas scikit-learn pyyaml
+
+      - name: Download ${{ matrix.dataset }} dataset
+        run: bash scripts/download_data.sh data
+
+      - name: Train ${{ matrix.dataset }}
+        run: |
+          mkdir -p checkpoints
+          PYTHONPATH=. python3 tgn/train.py \
+            --config configs/${{ matrix.dataset }}_full.yaml \
+            --data data/${{ matrix.dataset }}.csv \
+            | tee ${{ matrix.dataset }}_train_log.txt
+
+      - name: Upload checkpoint + logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.dataset }}-results
+          path: |
+            checkpoints/${{ matrix.dataset }}_best_model.pt
+            ${{ matrix.dataset }}_train_log.txt
+          retention-days: 14
