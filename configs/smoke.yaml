@@ -1,0 +1,19 @@
+data:
+  dataset_name: "sample_synthetic"
+  val_ratio: 0.15
+  test_ratio: 0.15
+
+model:
+  memory_dim: 32
+  message_dim: 32
+  time_dim: 16
+  embedding_dim: 32
+  predictor_hidden_dim: 32
+
+train:
+  batch_size: 50
+  epochs: 3
+  lr: 0.001
+  weight_decay: 0.00001
+  patience: 3
+  checkpoint_path: "checkpoints/best_model.pt"
