@@ -172,3 +172,33 @@ def test_full_tgn_training_and_inference(dummy_csv_path, tmp_path):
     assert len(probs) == 2
     mem_vec = service.get_node_memory_vector(0)
     assert len(mem_vec) == 16
+
+
+def test_loader_handles_real_jodie_header_format(tmp_path):
+    """Regression test: real JODIE files (wikipedia.csv, reddit.csv from
+    snap.stanford.edu) have a text header row with fewer columns than the
+    data rows (5 vs 176, since features are unrolled into separate columns).
+    This previously caused either a pandas ParserError or, worse, silent
+    column misalignment (pandas treating the extra columns as an implicit
+    index). This test pins the correct behavior on a file shaped like the
+    real dataset."""
+    import numpy as np
+    np.random.seed(0)
+    n, n_nodes, feat_dim = 50, 10, 172
+    header = "user_id,item_id,timestamp,state_label,comma_separated_features"
+    lines = [header]
+    for i in range(n):
+        src = np.random.randint(0, n_nodes)
+        dst = np.random.randint(0, n_nodes)
+        ts = float(i)
+        label = float(i % 2)
+        feats = ",".join(str(round(x, 4)) for x in np.random.randn(feat_dim))
+        lines.append(f"{src},{dst},{ts},{label},{feats}")
+    csv_path = tmp_path / "fake_jodie.csv"
+    csv_path.write_text("\n".join(lines))
+
+    full, train, val, test = load_jodie_data(str(csv_path), val_ratio=0.2, test_ratio=0.2)
+
+    assert full.num_interactions == n
+    assert full.edge_features.shape == (n, feat_dim)
+    assert set(np.unique(full.labels)).issubset({0.0, 1.0})

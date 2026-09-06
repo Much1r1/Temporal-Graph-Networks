@@ -3,6 +3,14 @@ import pandas as pd
 import torch
 from typing import Tuple, Optional, Dict, Any
 
+
+def _is_number(s: str) -> bool:
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
 class TemporalGraphData:
     """
     Data container for temporal graph interaction datasets (e.g. JODIE Wikipedia / Reddit).
@@ -39,7 +47,24 @@ def load_jodie_data(
     Loads and parses JODIE CSV formatted dataset into Train, Val, Test split TemporalGraphData containers.
     JODIE CSV format: user_id, item_id, timestamp, state_label, comma_separated_features...
     """
-    df = pd.read_csv(filepath, header=None)
+    # JODIE-format CSVs (wikipedia.csv, reddit.csv from snap.stanford.edu) have a
+    # single descriptive header line, e.g.:
+    #   user_id,item_id,timestamp,state_label,comma_separated_features
+    # followed by real data rows with the features expanded into N columns
+    # (172 for Wikipedia/Reddit). That header row has a different column count
+    # than the data rows, so it must be skipped rather than parsed as data --
+    # feeding it to pandas with header=None caused it to infer the wrong
+    # column count from that first line and crash on line 2.
+    #
+    # Test fixtures and other synthetic CSVs may be headerless, so detect
+    # the header rather than assuming it's always present: if the first
+    # field of the first line isn't numeric, treat that line as a header.
+    with open(filepath, "r") as f:
+        first_line = f.readline().strip()
+    first_field = first_line.split(",")[0]
+    has_header = not _is_number(first_field)
+
+    df = pd.read_csv(filepath, header=None, skiprows=1 if has_header else 0)
 
     sources = df.iloc[:, 0].values.astype(np.int64)
     # Ensure destination node IDs do not overlap with source IDs by remapping item IDs if needed
@@ -52,7 +77,7 @@ def load_jodie_data(
 
     # Remaining columns are edge features
     if df.shape[1] > 4:
-        edge_features = df.iloc[:, 4:].values.astype(np.float34 if np.float32 == np.float64 else np.float32)
+        edge_features = df.iloc[:, 4:].values.astype(np.float32)
     else:
         edge_features = np.zeros((len(sources), 1), dtype=np.float32)
 
