@@ -13,7 +13,9 @@ model:
 train:
   batch_size: 200
   epochs: 30
-  lr: 0.0001
+  lr: 0.00002   # was 0.0001 -- testing whether Reddit's instability (val loss
+                # rising every epoch after epoch 1) is an LR/overfitting issue
+                # rather than a wiring bug
   weight_decay: 0.00001
   patience: 5
   checkpoint_path: "checkpoints/reddit_best_model.pt"
